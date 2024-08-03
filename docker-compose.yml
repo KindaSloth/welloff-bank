@@ -1,0 +1,28 @@
+services:
+  postgres_db:
+    image: postgres:16
+    container_name: welloff_bank_postgres
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+      - ./pg_uuidv7/pg_uuidv7.so:/usr/lib/postgresql/16/lib/pg_uuidv7.so
+      - ./pg_uuidv7/pg_uuidv7--1.5.sql:/usr/share/postgresql/16/extension/pg_uuidv7--1.5.sql
+      - ./pg_uuidv7/pg_uuidv7.control:/usr/share/postgresql/16/extension/pg_uuidv7.control
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: welloff-bank
+      POSTGRES_PASSWORD: 5up3r_s3cur3_p4ssw0rd
+    ports:
+      - "5432:5432"
+    command: ["postgres", "-c", "log_statement=all", "-c", "log_destination=stderr", "-c", "max_connections=300"]
+
+  valkey:
+    image: valkey/valkey
+    container_name: welloff_bank_valkey
+    command: valkey-server
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres-data: null
