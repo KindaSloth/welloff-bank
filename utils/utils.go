@@ -23,3 +23,15 @@ func GetAccountBalance(ctx *gin.Context, account_id uuid.UUID) (model.AccountBal
 		Balance:   decimal.NewFromInt(0),
 	}, nil
 }
+
+func FilterTransactionsByKind(transactions []model.Transaction, kind string) []model.Transaction {
+	var filtered_transactions []model.Transaction
+
+	for _, transaction := range transactions {
+		if transaction.Kind == kind {
+			filtered_transactions = append(filtered_transactions, transaction)
+		}
+	}
+
+	return filtered_transactions
+}
