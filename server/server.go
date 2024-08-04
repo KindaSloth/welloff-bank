@@ -13,16 +13,29 @@ type Server struct {
 
 func New() *Server {
 	repositories := repository.New()
-	router := gin.Default()
 
 	server := Server{
 		Repositories: repositories,
-		Router:       router,
 	}
 
 	return &server
 }
 
-func (s *Server) Start(address string) {
-	s.Router.Run(address)
+func (s *Server) SetupRouter(addr string) *gin.Engine {
+	router := gin.Default()
+	router.Use(CorsMiddleware())
+
+	router.GET("/health-check", func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{"message": "OK"})
+	})
+
+	router.Use(s.AuthMiddleware())
+
+	return router
+}
+
+func (s *Server) Start(addr string) {
+	router := s.SetupRouter(addr)
+
+	router.Run(addr)
 }
