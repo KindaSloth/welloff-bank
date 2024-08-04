@@ -71,3 +71,14 @@ func (ac *AccountRepository) DisableAccount(acc_id string) error {
 
 	return err
 }
+
+func (ac *AccountRepository) GetBalanceSnapshot(account_id string) (*model.AccountBalance, error) {
+	balance_snapshot := new(model.AccountBalance)
+	err := ac.Pg.Get(
+		balance_snapshot,
+		`SELECT bs.account_id, bs.balance FROM "balance_snapshot" bs WHERE bs.account_id = $1`,
+		account_id,
+	)
+
+	return balance_snapshot, err
+}

@@ -20,4 +20,5 @@ type Account struct {
 type AccountBalance struct {
 	AccountId uuid.UUID       `db:"account_id" json:"account_id"`
 	Balance   decimal.Decimal `db:"balance" json:"balance"`
+	Date      time.Time       `db:"created_at" json:"created_at"`
 }

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"time"
 	"welloff-bank/model"
 
 	"github.com/google/uuid"
@@ -50,7 +51,27 @@ func (tr *TransactionRepository) GetTransactionsByAccount(account_id string, lim
 	return transactions, err
 }
 
-func (tr *TransactionRepository) GetTransactionsByDate(account_id string, date_from string, date_to string) (*[]model.Transaction, error) {
+func (tr *TransactionRepository) GetAllTransactionsByAccount(account_id string) (*[]model.Transaction, error) {
+	transactions := new([]model.Transaction)
+	err := tr.Pg.Select(
+		transactions,
+		`
+		SELECT 
+			tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id, tx.created_at, tx.updated_at
+		FROM 
+			"transaction" tx 
+		WHERE 
+			tx.from_account_id = $1
+		ORDER BY
+			tx.date_issued DESC
+		`,
+		account_id,
+	)
+
+	return transactions, err
+}
+
+func (tr *TransactionRepository) GetTransactionsByDate(account_id string, date_from time.Time, date_to time.Time) (*[]model.Transaction, error) {
 	transactions := new([]model.Transaction)
 	err := tr.Pg.Select(
 		transactions,

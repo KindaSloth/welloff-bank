@@ -1,8 +1,12 @@
 package utils
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"time"
 	"welloff-bank/model"
+	"welloff-bank/repository"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -17,11 +21,67 @@ func GetUser(ctx *gin.Context) (*model.User, error) {
 	return &user, err
 }
 
-func GetAccountBalance(ctx *gin.Context, account_id uuid.UUID) (model.AccountBalance, error) {
-	return model.AccountBalance{
-		AccountId: account_id,
-		Balance:   decimal.NewFromInt(0),
-	}, nil
+func GetAccountBalance(ctx *gin.Context, account_id uuid.UUID, repostiories repository.Repositories) (*model.AccountBalance, error) {
+	account, err := repostiories.AccountRepository.GetAccount(account_id.String())
+	if err != nil {
+		return nil, errors.New("failed to get account")
+	}
+
+	balance := decimal.Zero
+	now := time.Now().UTC()
+	var cache_time time.Time
+
+	valkey := repostiories.Valkey
+	cached_balance_as_bytes, err := valkey.Do(context.Background(), valkey.B().Get().Key(account.Id.String()).Build()).AsBytes()
+	if err == nil {
+		var cached_balance model.AccountBalance
+		err = json.Unmarshal(cached_balance_as_bytes, &cached_balance)
+		if err == nil {
+			balance = cached_balance.Balance
+			cache_time = cached_balance.Date
+		}
+	} else {
+		balance_snapshot, err := repostiories.AccountRepository.GetBalanceSnapshot(account.Id.String())
+		if err == nil && balance_snapshot != nil {
+			balance = balance_snapshot.Balance
+			cache_time = balance_snapshot.Date
+		}
+	}
+
+	var transactions *[]model.Transaction
+	if balance.GreaterThan(decimal.Zero) {
+		transactions, err = repostiories.TransactionRepository.GetTransactionsByDate(account.Id.String(), cache_time, now)
+	} else {
+		transactions, err = repostiories.TransactionRepository.GetAllTransactionsByAccount(account.Id.String())
+	}
+
+	if err == nil && transactions != nil {
+		for _, transaction := range *transactions {
+			switch transaction.Kind {
+			case "deposit":
+				balance = balance.Add(transaction.Amount)
+			case "withdrawal":
+				balance = balance.Sub(transaction.Amount)
+			case "transfer", "refund":
+				return nil, errors.New("not implemented yet")
+			default:
+				return nil, errors.New("unknown transaction kind")
+			}
+		}
+	}
+
+	account_balance := model.AccountBalance{
+		AccountId: account.Id,
+		Balance:   balance,
+		Date:      now,
+	}
+
+	b, err := json.Marshal(account_balance)
+	if err == nil {
+		_ = valkey.Do(ctx, valkey.B().Set().Key(account.Id.String()).Value(string(b)).Nx().Build()).Error()
+	}
+
+	return &account_balance, nil
 }
 
 func FilterTransactionsByKind(transactions []model.Transaction, kind string) []model.Transaction {
