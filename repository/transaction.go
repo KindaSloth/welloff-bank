@@ -50,7 +50,7 @@ func (tr *TransactionRepository) GetTransactionsByAccount(account_id string, lim
 	return transactions, err
 }
 
-func (tr *TransactionRepository) GetTransactionsByDate(account_id string, date_from string, date_to string, limit int, offset int) (*[]model.Transaction, error) {
+func (tr *TransactionRepository) GetTransactionsByDate(account_id string, date_from string, date_to string) (*[]model.Transaction, error) {
 	transactions := new([]model.Transaction)
 	err := tr.Pg.Select(
 		transactions,
@@ -65,16 +65,10 @@ func (tr *TransactionRepository) GetTransactionsByDate(account_id string, date_f
 			tx.date_issued BETWEEN $2 AND $3
 		ORDER BY
 			tx.date_issued DESC
-		LIMIT 
-			$4
-		OFFSET 
-			$5
 		`,
 		account_id,
 		date_from,
 		date_to,
-		limit,
-		offset,
 	)
 
 	return transactions, err
