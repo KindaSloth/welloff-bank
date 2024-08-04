@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"log"
+	"time"
 	"welloff-bank/utils"
 
 	"github.com/gin-gonic/gin"
@@ -85,7 +86,7 @@ func (s *Server) Login() gin.HandlerFunc {
 		}
 
 		valkey := s.Repositories.Valkey
-		err = valkey.Do(ctx, valkey.B().Set().Key(session_id.String()).Value(user.Id.String()).Nx().Build()).Error()
+		err = valkey.Do(ctx, valkey.B().Set().Key(session_id.String()).Value(user.Id.String()).Ex(24*time.Hour).Build()).Error()
 		if err != nil {
 			log.Println("[ERROR] [Login] an unexpected error occurred while storing user session: ", err)
 			ctx.JSON(500, gin.H{"error": "Unexpected error :("})

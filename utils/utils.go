@@ -78,7 +78,8 @@ func GetAccountBalance(ctx *gin.Context, account_id uuid.UUID, repostiories repo
 
 	b, err := json.Marshal(account_balance)
 	if err == nil {
-		_ = valkey.Do(ctx, valkey.B().Set().Key(account.Id.String()).Value(string(b)).Nx().Build()).Error()
+		valkey.Do(ctx, valkey.B().Del().Key(account.Id.String()).Build())
+		valkey.Do(ctx, valkey.B().Set().Key(account.Id.String()).Value(string(b)).Ex(24*time.Hour).Build())
 	}
 
 	return &account_balance, nil

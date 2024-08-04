@@ -17,7 +17,7 @@ func (tr *TransactionRepository) GetTransaction(transaction_id string) (*model.T
 	transaction := new(model.Transaction)
 	err := tr.Pg.Get(
 		transaction,
-		`SELECT tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id, tx.created_at, tx.updated_at
+		`SELECT tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id
 		FROM "transaction" tx WHERE tx.id = $1`,
 		transaction_id,
 	)
@@ -31,7 +31,7 @@ func (tr *TransactionRepository) GetTransactionsByAccount(account_id string, lim
 		transactions,
 		`
 		SELECT 
-			tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id, tx.created_at, tx.updated_at
+			tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id
 		FROM 
 			"transaction" tx 
 		WHERE 
@@ -57,11 +57,11 @@ func (tr *TransactionRepository) GetAllTransactionsByAccount(account_id string) 
 		transactions,
 		`
 		SELECT 
-			tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id, tx.created_at, tx.updated_at
+			tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id
 		FROM 
 			"transaction" tx 
 		WHERE 
-			tx.from_account_id = $1
+			(tx.from_account_id = $1 OR tx.to_account_id = $1)
 		ORDER BY
 			tx.date_issued DESC
 		`,
@@ -77,11 +77,11 @@ func (tr *TransactionRepository) GetTransactionsByDate(account_id string, date_f
 		transactions,
 		`
 		SELECT 
-			tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id, tx.created_at, tx.updated_at
+			tx.id, tx.kind, tx.from_account_id, tx.to_account_id, tx.amount, tx.date_issued, tx.related_transaction_id
 		FROM 
 			"transaction" tx 
 		WHERE 
-			tx.from_account_id = $1
+			(tx.from_account_id = $1 OR tx.to_account_id = $1)
 		AND 
 			tx.date_issued BETWEEN $2 AND $3
 		ORDER BY

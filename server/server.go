@@ -41,6 +41,11 @@ func (s *Server) SetupRouter(addr string) *gin.Engine {
 	router.GET("/account/:id", s.GetAccount())
 	router.DELETE("/account/:id", s.DisableAccount())
 
+	// Transaction enpoints
+	router.GET("/transaction/:id", s.GetTransaction())
+	router.POST("/transaction/deposit", s.DepositTransaction())
+	router.POST("/transaction/withdrawal", s.WithdrawalTransaction())
+
 	return router
 }
 

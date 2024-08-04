@@ -63,14 +63,12 @@ func (s *Server) GetAccount() gin.HandlerFunc {
 
 		account, err := s.Repositories.AccountRepository.GetAccount(account_id)
 		if err != nil {
-			log.Println("[ERROR] [GetAccount] failed to get account: ", err)
-			ctx.JSON(500, gin.H{"error": "Failed to get account"})
+			ctx.JSON(404, gin.H{"error": "Account not found"})
 			return
 		}
 
 		if account.UserId.String() != user.Id.String() {
-			log.Println("[ERROR] [GetAccount] account not found: ", err)
-			ctx.JSON(404, gin.H{"error": "Account not found"})
+			ctx.JSON(401, gin.H{"error": "User is not the owner of the account"})
 			return
 		}
 
