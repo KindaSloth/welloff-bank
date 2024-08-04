@@ -28,8 +28,12 @@ func (s *Server) SetupRouter(addr string) *gin.Engine {
 	router.GET("/health-check", func(ctx *gin.Context) {
 		ctx.JSON(200, gin.H{"message": "OK"})
 	})
+	router.POST("/register", s.Register())
+	router.POST("/login", s.Login())
 
 	router.Use(s.AuthMiddleware())
+
+	router.GET("/me", s.Me())
 
 	return router
 }
