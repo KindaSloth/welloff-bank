@@ -33,7 +33,13 @@ func (s *Server) SetupRouter(addr string) *gin.Engine {
 
 	router.Use(s.AuthMiddleware())
 
+	// User enpoints
 	router.GET("/me", s.Me())
+
+	// Account enpoints
+	router.POST("/account", s.CreateAccount())
+	router.GET("/account/:id", s.GetAccount())
+	router.DELETE("/account/:id", s.DisableAccount())
 
 	return router
 }
