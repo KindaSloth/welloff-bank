@@ -219,3 +219,16 @@ func (s *Server) TransferTransaction() gin.HandlerFunc {
 		ctx.Status(200)
 	}
 }
+
+func (s *Server) RefundTransaction() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		transaction_id := ctx.Param("id")
+		if transaction_id == "" {
+			ctx.JSON(400, gin.H{"error": "Missing id param"})
+			return
+		}
+
+		// TODO
+		ctx.Status(400)
+	}
+}

@@ -46,6 +46,7 @@ func (s *Server) SetupRouter(addr string) *gin.Engine {
 	router.POST("/transaction/deposit", s.DepositTransaction())
 	router.POST("/transaction/withdrawal", s.WithdrawalTransaction())
 	router.POST("/transaction/transfer", s.TransferTransaction())
+	router.POST("/transaction/refund/:id", s.RefundTransaction())
 
 	return router
 }
