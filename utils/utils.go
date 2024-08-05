@@ -62,8 +62,22 @@ func GetAccountBalance(ctx *gin.Context, account_id uuid.UUID, repostiories repo
 				balance = balance.Add(transaction.Amount)
 			case "withdrawal":
 				balance = balance.Sub(transaction.Amount)
-			case "transfer", "refund":
-				return nil, errors.New("not implemented yet")
+			case "transfer":
+				if transaction.FromAccountId != nil && *transaction.FromAccountId == account.Id {
+					balance = balance.Sub(transaction.Amount)
+				}
+
+				if transaction.ToAccountId != nil && *transaction.ToAccountId == account.Id {
+					balance = balance.Add(transaction.Amount)
+				}
+			case "refund":
+				if transaction.FromAccountId != nil && *transaction.FromAccountId == account.Id {
+					balance = balance.Add(transaction.Amount)
+				}
+
+				if transaction.ToAccountId != nil && *transaction.ToAccountId == account.Id {
+					balance = balance.Sub(transaction.Amount)
+				}
 			default:
 				return nil, errors.New("unknown transaction kind")
 			}
