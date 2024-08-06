@@ -21,7 +21,7 @@ func GetUser(ctx *gin.Context) (*model.User, error) {
 	return &user, err
 }
 
-func GetAccountBalance(ctx *gin.Context, account_id uuid.UUID, repostiories repository.Repositories) (*model.AccountBalance, error) {
+func GetAccountBalance(ctx context.Context, account_id uuid.UUID, repostiories repository.Repositories) (*model.AccountBalance, error) {
 	account, err := repostiories.AccountRepository.GetAccount(account_id.String())
 	if err != nil {
 		return nil, errors.New("failed to get account")
@@ -50,7 +50,7 @@ func GetAccountBalance(ctx *gin.Context, account_id uuid.UUID, repostiories repo
 
 	var transactions *[]model.Transaction
 	if balance.GreaterThan(decimal.Zero) {
-		transactions, err = repostiories.TransactionRepository.GetTransactionsByDate(account.Id.String(), cache_time, now)
+		transactions, err = repostiories.TransactionRepository.GetTransactionsByDate(account.Id.String(), cache_time.UTC(), now)
 	} else {
 		transactions, err = repostiories.TransactionRepository.GetAllTransactionsByAccount(account.Id.String())
 	}

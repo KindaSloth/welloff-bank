@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log"
 	"welloff-bank/utils"
 
@@ -72,7 +73,7 @@ func (s *Server) GetAccount() gin.HandlerFunc {
 			return
 		}
 
-		account_balance, err := utils.GetAccountBalance(ctx, account.Id, s.Repositories)
+		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
 		if err != nil {
 			log.Println("[ERROR] [GetAccount] failed to get account balance: ", err)
 			ctx.JSON(500, gin.H{"error": "Failed to get account balance"})
@@ -115,7 +116,7 @@ func (s *Server) DisableAccount() gin.HandlerFunc {
 			return
 		}
 
-		account_balance, err := utils.GetAccountBalance(ctx, account.Id, s.Repositories)
+		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
 		if err != nil {
 			log.Println("[ERROR] [DisableAccount] failed to get account balance: ", err)
 			ctx.JSON(500, gin.H{"error": "Failed to get account balance"})

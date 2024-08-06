@@ -1,9 +1,14 @@
 package server
 
 import (
+	"context"
+	"log"
+	"welloff-bank/model"
 	"welloff-bank/repository"
+	"welloff-bank/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/robfig/cron"
 )
 
 type Server struct {
@@ -49,6 +54,48 @@ func (s *Server) SetupRouter(addr string) *gin.Engine {
 	router.POST("/transaction/refund/:id", s.RefundTransaction())
 
 	return router
+}
+
+func (s *Server) StartCron() {
+	c := cron.New()
+	c.AddFunc("@every 10m", func() {
+		log.Println("[INFO] [StartCron] running...")
+
+		limit := 100
+		offset := 0
+		up_to_date := false
+
+		for !up_to_date {
+			accounts, err := s.Repositories.AccountRepository.GetAccounts(limit, offset)
+			if err != nil {
+				log.Println("[ERROR] [StartCron] failed to get accounts: ", err)
+				return
+			}
+
+			balances := make([]model.AccountBalance, 0)
+			for _, account := range *accounts {
+				balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
+				if err != nil {
+					log.Println("[ERROR] [StartCron] failed to get account balance: ", err)
+					return
+				}
+
+				balances = append(balances, *balance)
+			}
+
+			err = s.Repositories.AccountRepository.BulkUpsertBalanceSnapshots(&balances)
+			if err != nil {
+				log.Println("[ERROR] [StartCron] failed to upsert balance snapshots: ", err)
+				return
+			}
+
+			offset += limit
+			if len(*accounts) < limit {
+				up_to_date = true
+			}
+		}
+	})
+	c.Start()
 }
 
 func (s *Server) Start(addr string) {

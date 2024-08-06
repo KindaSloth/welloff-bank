@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log"
 	"welloff-bank/utils"
 
@@ -115,7 +116,7 @@ func (s *Server) WithdrawalTransaction() gin.HandlerFunc {
 			return
 		}
 
-		account_balance, err := utils.GetAccountBalance(ctx, account.Id, s.Repositories)
+		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
 		if err != nil {
 			log.Println("[ERROR] [WithdrawalTransaction] failed to get account balance: ", err)
 			ctx.JSON(500, gin.H{"error": "Failed to complete withdrawal transaction"})
@@ -184,7 +185,7 @@ func (s *Server) TransferTransaction() gin.HandlerFunc {
 			return
 		}
 
-		account_balance, err := utils.GetAccountBalance(ctx, account.Id, s.Repositories)
+		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
 		if err != nil {
 			log.Println("[ERROR] [TransferTransaction] failed to get account balance: ", err)
 			ctx.JSON(500, gin.H{"error": "Failed to complete transfer transaction"})
@@ -266,7 +267,7 @@ func (s *Server) RefundTransaction() gin.HandlerFunc {
 			return
 		}
 
-		to_account_balance, err := utils.GetAccountBalance(ctx, to_account.Id, s.Repositories)
+		to_account_balance, err := utils.GetAccountBalance(context.Background(), to_account.Id, s.Repositories)
 		if err != nil {
 			log.Println("[ERROR] [RefundTransaction] failed to get account balance: ", err)
 			ctx.JSON(500, gin.H{"error": "Failed to complete refund transaction"})

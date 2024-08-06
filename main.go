@@ -21,5 +21,6 @@ func main() {
 	}
 
 	s := server.New()
+	s.StartCron()
 	s.Start(addr)
 }
