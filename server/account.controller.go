@@ -74,7 +74,7 @@ func (s *Server) GetAccount() gin.HandlerFunc {
 			return
 		}
 
-		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
+		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories, true)
 		if err != nil {
 			log.Println("[ERROR] [GetAccount] failed to get account balance: ", err)
 			ctx.JSON(500, gin.H{"error": "Failed to get account balance"})
@@ -127,7 +127,7 @@ func (s *Server) GetAccounts() gin.HandlerFunc {
 		var payload []GetAccountsResponse
 
 		for _, account := range *accounts {
-			balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
+			balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories, true)
 			if err != nil {
 				log.Println("[ERROR] [GetAccounts] failed to get account balance: ", err)
 				ctx.JSON(500, gin.H{"error": "Failed to get account balance"})
@@ -173,7 +173,7 @@ func (s *Server) DisableAccount() gin.HandlerFunc {
 			return
 		}
 
-		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
+		account_balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories, false)
 		if err != nil {
 			log.Println("[ERROR] [DisableAccount] failed to get account balance: ", err)
 			ctx.JSON(500, gin.H{"error": "Failed to get account balance"})

@@ -75,7 +75,7 @@ func (s *Server) StartCron() {
 
 			balances := make([]model.AccountBalance, 0)
 			for _, account := range *accounts {
-				balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
+				balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories, false)
 				if err != nil {
 					log.Println("[ERROR] [StartCron] failed to get account balance: ", err)
 					return

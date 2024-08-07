@@ -21,7 +21,7 @@ func GetUser(ctx *gin.Context) (*model.User, error) {
 	return &user, err
 }
 
-func GetAccountBalance(ctx context.Context, account_id uuid.UUID, repostiories repository.Repositories) (*model.AccountBalance, error) {
+func GetAccountBalance(ctx context.Context, account_id uuid.UUID, repostiories repository.Repositories, set_cache bool) (*model.AccountBalance, error) {
 	account, err := repostiories.AccountRepository.GetAccount(account_id.String())
 	if err != nil {
 		return nil, errors.New("failed to get account")
@@ -90,10 +90,12 @@ func GetAccountBalance(ctx context.Context, account_id uuid.UUID, repostiories r
 		Date:      now,
 	}
 
-	b, err := json.Marshal(account_balance)
-	if err == nil {
-		valkey.Do(ctx, valkey.B().Del().Key(account.Id.String()).Build())
-		valkey.Do(ctx, valkey.B().Set().Key(account.Id.String()).Value(string(b)).Ex(24*time.Hour).Build())
+	if set_cache {
+		b, err := json.Marshal(account_balance)
+		if err == nil {
+			valkey.Do(ctx, valkey.B().Del().Key(account.Id.String()).Build())
+			valkey.Do(ctx, valkey.B().Set().Key(account.Id.String()).Value(string(b)).Ex(24*time.Hour).Build())
+		}
 	}
 
 	return &account_balance, nil
