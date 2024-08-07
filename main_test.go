@@ -14,8 +14,10 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// TODO: create a test postgres and valkey instance
+
 func TransferTransactionRequest(from_account_id string, to_account_id string, amount string) error {
-	url := "http://localhost:5000/transaction/transfer"
+	url := "http://localhost:5001/transaction/transfer"
 	payload := []byte(`{
 		"amount": "` + amount + `",
 		"from_account_id": "` + from_account_id + `",
@@ -43,7 +45,7 @@ func TransferTransactionRequest(from_account_id string, to_account_id string, am
 }
 
 func DepositTransactionRequest(to_account_id string, amount string) error {
-	url := "http://localhost:5000/transaction/deposit"
+	url := "http://localhost:5001/transaction/deposit"
 	payload := []byte(`{
 		"amount": "` + amount + `",
 		"to_account_id": "` + to_account_id + `"
@@ -70,7 +72,7 @@ func DepositTransactionRequest(to_account_id string, amount string) error {
 }
 
 func WithdrawalTransactionRequest(from_account_id string, amount string) error {
-	url := "http://localhost:5000/transaction/withdrawal"
+	url := "http://localhost:5001/transaction/withdrawal"
 	payload := []byte(`{
 		"amount": "` + amount + `",
 		"from_account_id": "` + from_account_id + `"
@@ -103,7 +105,7 @@ func TestBalanceCorrectnessAfterMultipleTransactions(t *testing.T) {
 	}
 	server := server.New()
 
-	go func() { server.Start("localhost:5000") }()
+	go func() { server.Start("localhost:5001") }()
 
 	DepositTransactionRequest("01911f41-f631-734b-a631-46aca9614536", "1000.00")
 
