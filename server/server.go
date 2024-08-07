@@ -44,6 +44,7 @@ func (s *Server) SetupRouter(addr string) *gin.Engine {
 	// Account enpoints
 	router.POST("/account", s.CreateAccount())
 	router.GET("/account/:id", s.GetAccount())
+	router.GET("/accounts", s.GetAccounts())
 	router.DELETE("/account/:id", s.DisableAccount())
 
 	// Transaction enpoints

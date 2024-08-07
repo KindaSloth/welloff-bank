@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log"
+	"strconv"
 	"welloff-bank/utils"
 
 	"github.com/gin-gonic/gin"
@@ -86,6 +87,62 @@ func (s *Server) GetAccount() gin.HandlerFunc {
 			Balance: account_balance.Balance.String(),
 			Status:  account.Status,
 		}})
+	}
+}
+
+type GetAccountsResponse struct {
+	AccountId string `json:"account_id"`
+	Name      string `json:"name"`
+	Balance   string `json:"balance"`
+	// 'active' | 'inactive'
+	Status string `json:"status"`
+}
+
+func (s *Server) GetAccounts() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		limit, err := strconv.Atoi(ctx.Query("limit"))
+		if err != nil || limit == 0 {
+			limit = 10
+		}
+
+		offset, err := strconv.Atoi(ctx.Query("offset"))
+		if err != nil || offset < 0 {
+			offset = 0
+		}
+
+		user, err := utils.GetUser(ctx)
+		if err != nil {
+			log.Println("[ERROR] [GetAccount] failed to get user from context: ", err)
+			ctx.Status(401)
+			return
+		}
+
+		accounts, err := s.Repositories.AccountRepository.GetMyAccounts(user.Id.String(), limit, offset)
+		if err != nil {
+			log.Println("[ERROR] [GetAccounts] failed to get accounts: ", err)
+			ctx.JSON(500, gin.H{"error": "Failed to get accounts"})
+			return
+		}
+
+		var payload []GetAccountsResponse
+
+		for _, account := range *accounts {
+			balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories)
+			if err != nil {
+				log.Println("[ERROR] [GetAccounts] failed to get account balance: ", err)
+				ctx.JSON(500, gin.H{"error": "Failed to get account balance"})
+				return
+			}
+
+			payload = append(payload, GetAccountsResponse{
+				AccountId: account.Id.String(),
+				Name:      account.Name,
+				Balance:   balance.Balance.String(),
+				Status:    account.Status,
+			})
+		}
+
+		ctx.JSON(200, gin.H{"payload": payload})
 	}
 }
 
