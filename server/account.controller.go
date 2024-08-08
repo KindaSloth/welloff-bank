@@ -93,7 +93,6 @@ func (s *Server) GetAccount() gin.HandlerFunc {
 type GetAccountsResponse struct {
 	AccountId string `json:"account_id"`
 	Name      string `json:"name"`
-	Balance   string `json:"balance"`
 	// 'active' | 'inactive'
 	Status string `json:"status"`
 }
@@ -127,17 +126,9 @@ func (s *Server) GetAccounts() gin.HandlerFunc {
 		var payload []GetAccountsResponse
 
 		for _, account := range *accounts {
-			balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories, true)
-			if err != nil {
-				log.Println("[ERROR] [GetAccounts] failed to get account balance: ", err)
-				ctx.JSON(500, gin.H{"error": "Failed to get account balance"})
-				return
-			}
-
 			payload = append(payload, GetAccountsResponse{
 				AccountId: account.Id.String(),
 				Name:      account.Name,
-				Balance:   balance.Balance.String(),
 				Status:    account.Status,
 			})
 		}
