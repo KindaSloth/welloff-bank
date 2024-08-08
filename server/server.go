@@ -60,7 +60,7 @@ func (s *Server) SetupRouter(addr string) *gin.Engine {
 func (s *Server) StartCron() {
 	c := cron.New()
 	c.AddFunc("@every 10m", func() {
-		log.Println("[INFO] [StartCron] running...")
+		log.Println("[INFO] [Balance Snapshot Updater] running...")
 
 		limit := 100
 		offset := 0
@@ -69,7 +69,7 @@ func (s *Server) StartCron() {
 		for !up_to_date {
 			accounts, err := s.Repositories.AccountRepository.GetAccounts(limit, offset)
 			if err != nil {
-				log.Println("[ERROR] [StartCron] failed to get accounts: ", err)
+				log.Println("[ERROR] [Balance Snapshot Updater] failed to get accounts: ", err)
 				return
 			}
 
@@ -77,7 +77,7 @@ func (s *Server) StartCron() {
 			for _, account := range *accounts {
 				balance, err := utils.GetAccountBalance(context.Background(), account.Id, s.Repositories, false)
 				if err != nil {
-					log.Println("[ERROR] [StartCron] failed to get account balance: ", err)
+					log.Println("[ERROR] [Balance Snapshot Updater] failed to get account balance: ", err)
 					return
 				}
 
@@ -86,7 +86,7 @@ func (s *Server) StartCron() {
 
 			err = s.Repositories.AccountRepository.BulkUpsertBalanceSnapshots(&balances)
 			if err != nil {
-				log.Println("[ERROR] [StartCron] failed to upsert balance snapshots: ", err)
+				log.Println("[ERROR] [Balance Snapshot Updater] failed to upsert balance snapshots: ", err)
 				return
 			}
 
@@ -95,6 +95,8 @@ func (s *Server) StartCron() {
 				up_to_date = true
 			}
 		}
+
+		log.Println("[INFO] [Balance Snapshot Updater] completed")
 	})
 	c.Start()
 }
