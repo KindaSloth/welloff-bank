@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -68,7 +70,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TransferTransactionRequest(from_account_id string, to_account_id string, amount string) error {
+func TransferTransactionRequest(from_account_id string, to_account_id string, amount string) (string, error) {
 	url := "http://localhost:5001/transaction/transfer"
 	payload := []byte(`{
 		"amount": "` + amount + `",
@@ -78,7 +80,7 @@ func TransferTransactionRequest(from_account_id string, to_account_id string, am
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -87,12 +89,23 @@ func TransferTransactionRequest(from_account_id string, to_account_id string, am
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer resp.Body.Close()
 
-	return nil
+	var payload_resp interface{}
+	err = json.NewDecoder(resp.Body).Decode(&payload_resp)
+	if err != nil {
+		return "", err
+	}
+
+	transaction_id, ok := payload_resp.(map[string]interface{})["payload"].(map[string]interface{})["transaction_id"].(string)
+	if !ok {
+		return "", fmt.Errorf("failed to parse transaction id")
+	}
+
+	return transaction_id, nil
 }
 
 func DepositTransactionRequest(to_account_id string, amount string) error {
@@ -148,7 +161,26 @@ func WithdrawalTransactionRequest(from_account_id string, amount string) error {
 	return nil
 }
 
-func RefundTransactionRequest(from_account_id string, amount string) error {
+func RefundTransactionRequest(transaction_id string) error {
+	url := "http://localhost:5001/transaction/refund/" + transaction_id
+	payload := []byte(`{}`)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Cookie", "sessionId="+sessionId+"; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
 	return nil
 }
 
@@ -206,8 +238,8 @@ func TestBalanceCorrectnessAfterMultipleDepositAndWithdrawalTransactions(t *test
 	}
 }
 
-func TestBalanceCorrectnessAfterMultipleTransferTransactions(t *testing.T) {
-	DepositTransactionRequest(user_account, "1000.00")
+func TestBalanceCorrectnessAfterMultipleTransactions(t *testing.T) {
+	DepositTransactionRequest(user_account, "100.00")
 
 	user_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(user_account), s.Repositories, false)
 	if err != nil {
@@ -219,20 +251,20 @@ func TestBalanceCorrectnessAfterMultipleTransferTransactions(t *testing.T) {
 		t.Error(err)
 	}
 
-	numRequests := 100
+	requests_num := 100
 	parallelism := 10
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallelism)
 
-	for i := 0; i < numRequests; i++ {
+	for i := 0; i < requests_num; i++ {
 		wg.Add(1)
 		sem <- struct{}{}
 
 		go func() {
 			defer func() { <-sem }()
 			defer wg.Done()
-			err := TransferTransactionRequest(user_account, transferable_account, "1.00")
+			_, err := TransferTransactionRequest(user_account, transferable_account, "1.00")
 			if err != nil {
 				t.Error(err)
 			}
@@ -251,16 +283,76 @@ func TestBalanceCorrectnessAfterMultipleTransferTransactions(t *testing.T) {
 		t.Error(err)
 	}
 
-	expected_user_account_balance := user_account_balance.Balance.Sub(decimal.NewFromInt(int64(numRequests))).String()
+	expected_user_account_balance := user_account_balance.Balance.Sub(decimal.NewFromInt(int64(requests_num))).String()
 	if expected_user_account_balance != new_user_account_balance.Balance.String() {
 		t.Errorf("User Account Balance is not correct. Expected: %s, Actual: %s", expected_user_account_balance, new_user_account_balance.Balance.String())
 	}
 
-	expected_transferable_account_balance := transferable_account_balance.Balance.Add(decimal.NewFromInt(int64(numRequests))).String()
+	expected_transferable_account_balance := transferable_account_balance.Balance.Add(decimal.NewFromInt(int64(requests_num))).String()
 	if expected_transferable_account_balance != new_transferable_account_balance.Balance.String() {
 		t.Errorf("Transferable Account Balance is not correct. Expected: %s, Actual: %s", expected_transferable_account_balance, new_transferable_account_balance.Balance.String())
 	}
 }
 
-func TestBalanceCorrectnessAfterMultipleTransferTransactionsWithRefund(t *testing.T) {
+func TestBalanceCorrectnessAfterMultipleTransactionsWithRefund(t *testing.T) {
+	DepositTransactionRequest(user_account, "100.00")
+
+	user_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(user_account), s.Repositories, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	transferable_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(transferable_account), s.Repositories, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	requests_num := 100
+	refund_num := 50
+	parallelism := 10
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallelism)
+
+	for i := 0; i < requests_num; i++ {
+		wg.Add(1)
+		sem <- struct{}{}
+
+		go func(i int) {
+			defer func() { <-sem }()
+			defer wg.Done()
+			transaction_id, err := TransferTransactionRequest(user_account, transferable_account, "1.00")
+			if err != nil {
+				t.Error(err)
+			}
+			if i+1 <= refund_num {
+				err = RefundTransactionRequest(transaction_id)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	new_user_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(user_account), s.Repositories, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	new_transferable_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(transferable_account), s.Repositories, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expected_user_account_balance := user_account_balance.Balance.Sub(decimal.NewFromInt(int64(requests_num - refund_num))).String()
+	if expected_user_account_balance != new_user_account_balance.Balance.String() {
+		t.Errorf("User Account Balance is not correct. Expected: %s, Actual: %s", expected_user_account_balance, new_user_account_balance.Balance.String())
+	}
+
+	expected_transferable_account_balance := transferable_account_balance.Balance.Add(decimal.NewFromInt(int64(requests_num - refund_num))).String()
+	if expected_transferable_account_balance != new_transferable_account_balance.Balance.String() {
+		t.Errorf("Transferable Account Balance is not correct. Expected: %s, Actual: %s", expected_transferable_account_balance, new_transferable_account_balance.Balance.String())
+	}
 }
