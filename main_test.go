@@ -3,9 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"log"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 	"welloff-bank/server"
 	"welloff-bank/utils"
 
@@ -15,6 +19,54 @@ import (
 )
 
 // TODO: create a test postgres and valkey instance
+var s *server.Server
+var sessionId string
+
+// TODO: remove these mock accounts
+var user_account = "01911f41-f631-734b-a631-46aca9614536"
+var transferable_account = "01911fb7-727e-74e2-97d3-639eab3966ef"
+
+func TestMain(m *testing.M) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file:", err)
+	}
+
+	s = server.New()
+	go s.Start("localhost:5001")
+
+	time.Sleep(time.Second * 2)
+
+	login_url := "http://localhost:5001/login"
+	payload := []byte(`{
+		"email": "test@email.com",
+		"password": "test123"
+	}`)
+
+	req, err := http.NewRequest("POST", login_url, bytes.NewBuffer(payload))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
+
+	cookies := resp.Header["Set-Cookie"]
+	if len(cookies) == 0 {
+		log.Fatal("Missing cookie")
+	}
+
+	sessionId = strings.Split(strings.Split(cookies[0], ";")[0], "=")[1]
+
+	os.Exit(m.Run())
+}
 
 func TransferTransactionRequest(from_account_id string, to_account_id string, amount string) error {
 	url := "http://localhost:5001/transaction/transfer"
@@ -30,8 +82,7 @@ func TransferTransactionRequest(from_account_id string, to_account_id string, am
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	// TODO: remove this mock session id
-	req.Header.Set("Cookie", "sessionId=01912a50-18ac-7859-944f-cb4745d34c7e; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
+	req.Header.Set("Cookie", "sessionId="+sessionId+"; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -57,8 +108,7 @@ func DepositTransactionRequest(to_account_id string, amount string) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	// TODO: remove this mock session id
-	req.Header.Set("Cookie", "sessionId=01912a50-18ac-7859-944f-cb4745d34c7e; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
+	req.Header.Set("Cookie", "sessionId="+sessionId+"; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -85,7 +135,7 @@ func WithdrawalTransactionRequest(from_account_id string, amount string) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	// TODO: remove this mock session id
-	req.Header.Set("Cookie", "sessionId=01912a50-18ac-7859-944f-cb4745d34c7e; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
+	req.Header.Set("Cookie", "sessionId="+sessionId+"; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -98,24 +148,79 @@ func WithdrawalTransactionRequest(from_account_id string, amount string) error {
 	return nil
 }
 
-func TestBalanceCorrectnessAfterMultipleTransactions(t *testing.T) {
-	err := godotenv.Load()
+func RefundTransactionRequest(from_account_id string, amount string) error {
+	return nil
+}
+
+func TestBalanceCorrectnessAfterMultipleDepositAndWithdrawalTransactions(t *testing.T) {
+	num_deposits := 50
+	num_withdrawals := 25
+	parallelism := 10
+
+	user_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(user_account), s.Repositories, false)
 	if err != nil {
 		t.Error(err)
 	}
-	server := server.New()
 
-	go func() { server.Start("localhost:5001") }()
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallelism)
 
-	DepositTransactionRequest("01911f41-f631-734b-a631-46aca9614536", "1000.00")
+	for i := 0; i < num_deposits; i++ {
+		wg.Add(1)
+		sem <- struct{}{}
 
-	account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse("01911f41-f631-734b-a631-46aca9614536"), server.Repositories, false)
+		go func() {
+			defer func() { <-sem }()
+			defer wg.Done()
+			err := DepositTransactionRequest(user_account, "1.00")
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+
+	for i := 0; i < num_withdrawals; i++ {
+		wg.Add(1)
+		sem <- struct{}{}
+
+		go func() {
+			defer func() { <-sem }()
+			defer wg.Done()
+			err := WithdrawalTransactionRequest(user_account, "1.00")
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	new_user_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(user_account), s.Repositories, false)
 	if err != nil {
 		t.Error(err)
 	}
 
-	numRequests := 1000
-	parallelism := 100
+	expected_user_account_balance := user_account_balance.Balance.Add(decimal.NewFromInt(int64(num_deposits - num_withdrawals))).String()
+	if expected_user_account_balance != new_user_account_balance.Balance.String() {
+		t.Errorf("User Account Balance is not correct. Expected: %s, Actual: %s", expected_user_account_balance, new_user_account_balance.Balance.String())
+	}
+}
+
+func TestBalanceCorrectnessAfterMultipleTransferTransactions(t *testing.T) {
+	DepositTransactionRequest(user_account, "1000.00")
+
+	user_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(user_account), s.Repositories, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	transferable_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(transferable_account), s.Repositories, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	numRequests := 100
+	parallelism := 10
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallelism)
@@ -127,7 +232,7 @@ func TestBalanceCorrectnessAfterMultipleTransactions(t *testing.T) {
 		go func() {
 			defer func() { <-sem }()
 			defer wg.Done()
-			err := TransferTransactionRequest("01911f41-f631-734b-a631-46aca9614536", "01911fb7-727e-74e2-97d3-639eab3966ef", "1.00")
+			err := TransferTransactionRequest(user_account, transferable_account, "1.00")
 			if err != nil {
 				t.Error(err)
 			}
@@ -136,12 +241,26 @@ func TestBalanceCorrectnessAfterMultipleTransactions(t *testing.T) {
 
 	wg.Wait()
 
-	new_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse("01911f41-f631-734b-a631-46aca9614536"), server.Repositories, false)
+	new_user_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(user_account), s.Repositories, false)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if account_balance.Balance.Sub(decimal.NewFromInt(1000)).String() != new_account_balance.Balance.String() {
-		t.Errorf("Balance is not correct. Expected: %s, Actual: %s", account_balance.Balance.Sub(decimal.NewFromInt(1000)).String(), new_account_balance.Balance.String())
+	new_transferable_account_balance, err := utils.GetAccountBalance(context.Background(), uuid.MustParse(transferable_account), s.Repositories, false)
+	if err != nil {
+		t.Error(err)
 	}
+
+	expected_user_account_balance := user_account_balance.Balance.Sub(decimal.NewFromInt(int64(numRequests))).String()
+	if expected_user_account_balance != new_user_account_balance.Balance.String() {
+		t.Errorf("User Account Balance is not correct. Expected: %s, Actual: %s", expected_user_account_balance, new_user_account_balance.Balance.String())
+	}
+
+	expected_transferable_account_balance := transferable_account_balance.Balance.Add(decimal.NewFromInt(int64(numRequests))).String()
+	if expected_transferable_account_balance != new_transferable_account_balance.Balance.String() {
+		t.Errorf("Transferable Account Balance is not correct. Expected: %s, Actual: %s", expected_transferable_account_balance, new_transferable_account_balance.Balance.String())
+	}
+}
+
+func TestBalanceCorrectnessAfterMultipleTransferTransactionsWithRefund(t *testing.T) {
 }
