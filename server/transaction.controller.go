@@ -217,7 +217,7 @@ func (s *Server) TransferTransaction() gin.HandlerFunc {
 			return
 		}
 
-		ctx.Status(200)
+		ctx.JSON(200, gin.H{"payload": gin.H{"transaction_id": transaction_id}})
 	}
 }
 
