@@ -147,7 +147,6 @@ func WithdrawalTransactionRequest(from_account_id string, amount string) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	// TODO: remove this mock session id
 	req.Header.Set("Cookie", "sessionId="+sessionId+"; Max-Age=86400; Domain=localhost; Path=/; Secure; HttpOnly")
 
 	client := &http.Client{}
